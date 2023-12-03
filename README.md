@@ -1,6 +1,6 @@
 # Mini Storage Proof
 
-**This project is working in progress. Fixing minor issuses and working on starknet contracts**
+**This project is personal project and atm working in progress. Fixing minor issuses and working on starknet contracts**
 
 This is mini storage proof project, goal is to simplify the whole workflow with minimum implementation from accessing data on chain in trust-less way. This repo forrlowing [Herodotus Storage Proof Workflow](https://docs.herodotus.dev/herodotus-docs/developers/storage-proofs/workflow)
 
