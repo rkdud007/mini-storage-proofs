@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, vec};
 
 use anyhow::Result;
 use ethers::{prelude::*, utils::keccak256};
@@ -67,7 +67,35 @@ pub async fn get_encoded_block_header() -> Result<()> {
     Ok(())
 }
 
+async fn get_merkle_proof() -> Result<()> {
+    let client = Provider::<Http>::try_from(
+        "https://eth-goerli.g.alchemy.com/v2/OxCXO750oi6BTN1kndUMScfn6a16gFIm",
+    )
+    .expect("could not instantiate HTTP Provider");
+
+    let client = Arc::new(client);
+
+    let proof_response = client
+        .get_proof(
+            "0x3073F6Cd5799d754Ea93FcF54c53afd802477983",
+            vec![],
+            Some(BlockId::Number(BlockNumber::Latest)),
+        )
+        .await?;
+
+    println!("{:#?}", proof_response);
+    let mut account_proofs = vec![];
+    for account_proof in proof_response.account_proof {
+        account_proofs.push(account_proof.to_string());
+    }
+
+    println!("{:#?}", account_proofs);
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     let _ = get_encoded_block_header().await;
+    let _ = get_merkle_proof().await;
 }
