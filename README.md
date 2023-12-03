@@ -1,6 +1,6 @@
 # Mini Storage Proof
 
-**This project is personal project and atm working in progress. Fixing minor issuses and working on starknet contracts**
+**This project is totally personal project made it for fun and atm working in progress. Fixing minor issuses and working on starknet contracts**
 
 This is mini storage proof project, goal is to simplify the whole workflow with minimum implementation from accessing data on chain in trust-less way. This repo forrlowing [Herodotus Storage Proof Workflow](https://docs.herodotus.dev/herodotus-docs/developers/storage-proofs/workflow)
 
@@ -173,3 +173,8 @@ function verifyInclusion(
     return doesExist;
 }
 ```
+
+### Reference
+
+- [Herodotus EVM Fact Registry Contract](https://github.com/HerodotusDev/herodotus-evm/blob/master/src/core/FactsRegistry.sol)
+- [Optimism Secure Merkle Trie](https://github.com/ethereum-optimism/optimism/blob/05deae54595b0e6bdd33580de81cb9ad194898bc/packages/contracts-bedrock/src/libraries/trie/SecureMerkleTrie.sol#L6)
