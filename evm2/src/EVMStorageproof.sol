@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity >0.5.0 <0.8.21;
 
 import "../lib/Solidity-RLP/contracts/RLPReader.sol";
 import "./lib/external/trie/Lib_SecureMerkleTrie.sol";
