@@ -4,3 +4,6 @@
 [submodule "evm/lib/Solidity-RLP"]
 	path = evm/lib/Solidity-RLP
 	url = https://github.com/hamdiallam/Solidity-RLP
+[submodule "evm2/lib/forge-std"]
+	path = evm2/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
