@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../lib/Solidity-RLP/contracts/RLPReader.sol";
+import "./lib/external/trie/Lib_SecureMerkleTrie.sol";
 
 contract EVMStorageproof {
     using RLPReader for RLPReader.RLPItem;
@@ -102,7 +103,7 @@ contract EVMStorageproof {
         bytes memory blockHeader,
         RootType rootType,
         bytes32 key,
-        bytes32[] memory proof
+        bytes memory proof
     ) public view returns (bool) {
         // Retrieve the root based on the specified type
         bytes32 root;
@@ -116,12 +117,13 @@ contract EVMStorageproof {
             revert("Invalid root type");
         }
 
-        // 1. Calculate the key hash
-        bytes32 keyHash = keccak256(abi.encodePacked(key));
+        // 1. Calculate the key hash(=leaf)
+        (bool doesExist, bytes memory valueRLP) = Lib_SecureMerkleTrie.get(
+            abi.encodePacked(key),
+            proof,
+            root
+        );
 
-        // 2. Verify the proof
-
-        // 3. Verify the calculated hash matches the provided root
-        return keyHash == root;
+        return doesExist;
     }
 }

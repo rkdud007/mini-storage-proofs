@@ -14,6 +14,14 @@ fn encode_block_header(header: &EvmBlockHeader) -> Vec<u8> {
     stream.out().to_vec()
 }
 
+// fn encode_proof(proof: Vec<Bytes>) -> Vec<u8> {
+//     let mut stream = RlpStream::new();
+//     for item in proof {
+//         stream.append(&item);
+//     }
+//     stream.out().to_vec()
+// }
+
 pub async fn get_encoded_block_header() -> Result<()> {
     let client = Provider::<Http>::try_from(
         "https://eth-goerli.g.alchemy.com/v2/OxCXO750oi6BTN1kndUMScfn6a16gFIm",
@@ -78,16 +86,18 @@ async fn get_merkle_proof() -> Result<()> {
     let proof_response = client
         .get_proof(
             "0x3073F6Cd5799d754Ea93FcF54c53afd802477983",
-            vec![],
+            vec![H256::zero()],
             Some(BlockId::Number(BlockNumber::Latest)),
         )
         .await?;
 
     println!("{:#?}", proof_response);
-    let mut account_proofs = vec![];
-    for account_proof in proof_response.account_proof {
-        account_proofs.push(account_proof.to_string());
-    }
+
+    let account_proofs: Vec<Bytes> = proof_response.account_proof;
+    //let mut account_proofs = vec![];
+    // for account_proof in proof_response.account_proof {
+    //     account_proofs.push(account_proof.to_string());
+    // }
 
     println!("{:#?}", account_proofs);
 
