@@ -2,6 +2,8 @@
 
 **This project is totally personal project made it for fun and atm working in progress. Fixing minor issuses and working on starknet contracts**
 
+- [Goerli Storage Proof Contract](https://goerli.etherscan.io/address/0x2f8a2dee78f63e3d3e0d88300b7d86a8a01c7b52#code) : 0x2F8a2dEE78F63E3d3E0d88300b7d86A8a01C7B52
+
 This is mini storage proof project, goal is to simplify the whole workflow with minimum implementation from accessing data on chain in trust-less way. This repo forrlowing [Herodotus Storage Proof Workflow](https://docs.herodotus.dev/herodotus-docs/developers/storage-proofs/workflow)
 
 ## 1. Accessing the block hash(evm/EVMStorageproof.sol)
@@ -124,7 +126,7 @@ If you can get verified block header, you could decode it to get any kind of val
 
 ## 4. Verifying Data Against the Chosen Root (Optional) (evm/EVMStorageproof.sol & off-chain)
 
-You might want to retrieve specific values beneath those root. In this case, first need to generate compatible inclusion proof in off chain
+You might want to retrieve specific values beneath those root. In this case, first need to generate compatible inclusion proof in off chain. Below code is generating account proof for my wallet.
 
 ```rust
 let proof_response = client
