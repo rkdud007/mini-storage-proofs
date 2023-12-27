@@ -1,4 +1,4 @@
-use std::{sync::Arc, vec};
+use std::vec;
 
 use anyhow::Result;
 use ethers::{prelude::*, utils::keccak256};
@@ -14,25 +14,10 @@ fn encode_block_header(header: &EvmBlockHeader) -> Vec<u8> {
     stream.out().to_vec()
 }
 
-// fn encode_proof(proof: Vec<Bytes>) -> Vec<u8> {
-//     let mut stream = RlpStream::new();
-//     for item in proof {
-//         stream.append(&item);
-//     }
-//     stream.out().to_vec()
-// }
+pub async fn get_encoded_block_header(rpc_provider: &Provider<Http>) -> Result<u64> {
+    let block = rpc_provider.get_block(BlockNumber::Latest).await?.unwrap();
 
-pub async fn get_encoded_block_header() -> Result<()> {
-    let client = Provider::<Http>::try_from(
-        "https://eth-goerli.g.alchemy.com/v2/OxCXO750oi6BTN1kndUMScfn6a16gFIm",
-    )
-    .expect("could not instantiate HTTP Provider");
-
-    let client = Arc::new(client);
-
-    let block = client.get_block(BlockNumber::Latest).await?.unwrap();
-
-    println!("{:?}", block.number);
+    println!("block number: {:?}\n", block.number);
 
     let header_from_rpc = EvmBlockHeaderFromRpc {
         number: block.number.unwrap().as_u64().to_string(),
@@ -54,10 +39,8 @@ pub async fn get_encoded_block_header() -> Result<()> {
         total_difficulty: block.total_difficulty.unwrap().to_string(),
         transactions_root: hex::encode(block.transactions_root),
         base_fee_per_gas: block.base_fee_per_gas.map(|value| value.to_string()),
-        withdrawals_root: block.withdrawals_root.map(|value| hex::encode(value)),
+        withdrawals_root: block.withdrawals_root.map(hex::encode),
     };
-
-    // println!("{:#?}\n", header_from_rpc);
 
     let evm_block_header = EvmBlockHeader::from(&header_from_rpc);
 
@@ -65,47 +48,93 @@ pub async fn get_encoded_block_header() -> Result<()> {
 
     let encoded_block_header = encode_block_header(&evm_block_header);
     let blockheader_hex = hex::encode(&encoded_block_header);
-    println!("Hexadecimal Block Header: 0x{}", blockheader_hex);
+    println!("Hexadecimal Block Header: 0x{}\n", blockheader_hex);
 
     let blockhash = keccak256(encoded_block_header);
     let blockhash_hex = hex::encode(blockhash);
 
-    println!("Hexadecimal Block Hash: 0x{}", blockhash_hex);
+    println!("Hexadecimal Block Hash: 0x{}\n", blockhash_hex);
+
+    Ok(evm_block_header.number)
+}
+
+async fn get_account_proof(
+    blocknumber: u64,
+    rpc_provider: &Provider<Http>,
+    account: &str,
+) -> Result<()> {
+    let proof_response = rpc_provider
+        .get_proof(
+            account,
+            vec![H256::zero()],
+            Some(BlockId::Number(BlockNumber::Number(blocknumber.into()))),
+        )
+        .await?;
+
+    let account_proofs = proof_response.account_proof;
+    let proofs = concatenate_proof(account_proofs);
+    let rlp_encoded_proof = encode_rlp(proofs);
+    let proof_hex = hex::encode(rlp_encoded_proof);
+    println!("proof: 0x{}\n", proof_hex);
+    println!("account: {:?}\n", account);
 
     Ok(())
 }
 
-async fn get_merkle_proof() -> Result<()> {
-    let client = Provider::<Http>::try_from(
-        "https://eth-goerli.g.alchemy.com/v2/OxCXO750oi6BTN1kndUMScfn6a16gFIm",
-    )
-    .expect("could not instantiate HTTP Provider");
+fn concatenate_proof(account_proof: Vec<ethers::types::Bytes>) -> Vec<Vec<u8>> {
+    let mut proofs: Vec<Vec<u8>> = Vec::new();
+    for node in account_proof {
+        proofs.push(node.to_vec()); // Convert each Bytes to Vec<u8> and push to proofs
+    }
+    proofs
+}
 
-    let client = Arc::new(client);
+fn encode_rlp(proofs: Vec<Vec<u8>>) -> Vec<u8> {
+    let mut stream = RlpStream::new();
+    stream.begin_list(proofs.len()); // Begin a list to encode the array structure
+    for proof in proofs {
+        stream.append(&proof); // Append each proof as raw bytes
+    }
+    stream.out().to_vec() // Get the RLP-encoded bytes
+}
 
-    let proof_response = client
+async fn get_storage_proof(
+    blocknumber: u64,
+    rpc_provider: &Provider<Http>,
+    account: &str,
+    slot: H256,
+) -> Result<()> {
+    let proof_response = rpc_provider
         .get_proof(
-            "0x3073F6Cd5799d754Ea93FcF54c53afd802477983",
-            vec![H256::zero()],
-            Some(BlockId::Number(BlockNumber::Latest)),
+            account,
+            vec![slot],
+            Some(BlockId::Number(BlockNumber::Number(blocknumber.into()))),
         )
         .await?;
 
-    println!("{:#?}", proof_response);
-
-    let account_proofs: Vec<Bytes> = proof_response.account_proof;
-    //let mut account_proofs = vec![];
-    // for account_proof in proof_response.account_proof {
-    //     account_proofs.push(account_proof.to_string());
-    // }
-
-    println!("{:#?}", account_proofs);
+    let storageproof = proof_response.storage_proof;
+    let proofs = concatenate_proof(storageproof[0].proof.clone());
+    let rlp_encoded_proof = encode_rlp(proofs);
+    let proof_hex = hex::encode(rlp_encoded_proof);
+    println!("storage proof: 0x{}\n", proof_hex);
+    println!("storage account: {:?}\n", account);
 
     Ok(())
 }
 
 #[tokio::main]
 async fn main() {
-    let _ = get_encoded_block_header().await;
-    let _ = get_merkle_proof().await;
+    let rpc_provider = Provider::<Http>::try_from(
+        "https://eth-goerli.g.alchemy.com/v2/gfIH02sddAK81ihHEZcniDlaERa3D7d4",
+    )
+    .unwrap();
+    let blocknumber = get_encoded_block_header(&rpc_provider).await.unwrap();
+    // Random account
+    let account = "0x3073F6Cd5799d754Ea93FcF54c53afd802477983";
+    let _ = get_account_proof(blocknumber, &rpc_provider, account).await;
+
+    // Goerli USDC contract address
+    let account = "0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4";
+    let storage_slot = H256::zero();
+    let _ = get_storage_proof(blocknumber, &rpc_provider, account, storage_slot).await;
 }

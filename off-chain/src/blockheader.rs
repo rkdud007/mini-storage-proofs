@@ -69,7 +69,7 @@ impl From<&EvmBlockHeaderFromRpc> for EvmBlockHeader {
             base_fee_per_gas: value
                 .clone()
                 .base_fee_per_gas
-                .and_then(|x| Some(x.parse::<u64>().unwrap())),
+                .map(|x| x.parse::<u64>().unwrap()),
             withdrawals_root: value.withdrawals_root.clone(),
         }
     }
@@ -113,7 +113,11 @@ impl Encodable for EvmBlockHeader {
 
 fn safe_hex_decode(s: &str) -> Vec<u8> {
     // Ensure the string is without the '0x' prefix
-    let s = if s.starts_with("0x") { &s[2..] } else { s };
+    let s = if let Some(s) = s.strip_prefix("0x") {
+        s
+    } else {
+        s
+    };
 
     // Pad the string with a leading zero if it has an odd length
     let s = if s.len() % 2 != 0 {
@@ -122,5 +126,5 @@ fn safe_hex_decode(s: &str) -> Vec<u8> {
         s.to_string()
     };
 
-    hex::decode(&s).unwrap()
+    hex::decode(s).unwrap()
 }

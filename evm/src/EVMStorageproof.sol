@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "../lib/Solidity-RLP/contracts/RLPReader.sol";
 import "./lib/external/trie/Lib_SecureMerkleTrie.sol";
+import "./lib/external/rlp/Lib_RLPReader.sol";
 
 contract EVMStorageproof {
-    using RLPReader for RLPReader.RLPItem;
-    using RLPReader for RLPReader.Iterator;
-    using RLPReader for bytes;
+    using Lib_RLPReader for Lib_RLPReader.RLPItem;
+    using Lib_RLPReader for bytes;
 
-    enum RootType {
-        StateRoot,
-        TransactionsRoot,
-        ReceiptsRoot
-    }
+    uint8 private constant ACCOUNT_NONCE_INDEX = 0;
+    uint8 private constant ACCOUNT_BALANCE_INDEX = 1;
+    uint8 private constant ACCOUNT_STORAGE_ROOT_INDEX = 2;
+    uint8 private constant ACCOUNT_CODE_HASH_INDEX = 3;
+
+    bytes32 private constant EMPTY_TRIE_ROOT_HASH =
+        0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421;
+    bytes32 private constant EMPTY_CODE_HASH =
+        0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // =================================
     // Step 1. Accessing the block hash
@@ -55,7 +58,7 @@ contract EVMStorageproof {
     }
 
     // =================================
-    // 3. Determining the Desired Root (Optional)
+    // 3. Determining the Desired Root
     // =================================
 
     // get origin chain's state root on destination chain
@@ -66,8 +69,10 @@ contract EVMStorageproof {
         bool is_valid_header = getBlockHeader(blockNumber, blockHeader);
         require(is_valid_header, "Invalid block header");
 
-        RLPReader.RLPItem[] memory items = blockHeader.toRlpItem().toList();
-        return bytes32(items[3].toUint()); // The state root is the 4th item in a block header
+        Lib_RLPReader.RLPItem[] memory items = blockHeader
+            .toRLPItem()
+            .readList();
+        return bytes32(items[3].readUint256()); // The state root is the 4th item in a block header
     }
 
     // get origin chain's receipt root on destination chain
@@ -78,8 +83,10 @@ contract EVMStorageproof {
         bool is_valid_header = getBlockHeader(blockNumber, blockHeader);
         require(is_valid_header, "Invalid block header");
 
-        RLPReader.RLPItem[] memory items = blockHeader.toRlpItem().toList();
-        return bytes32(items[5].toUint()); // The receipts root is the 6th item
+        Lib_RLPReader.RLPItem[] memory items = blockHeader
+            .toRLPItem()
+            .readList();
+        return bytes32(items[5].readUint256()); // The receipts root is the 6th item
     }
 
     // get origin chain's transaction root on destination chain
@@ -90,40 +97,97 @@ contract EVMStorageproof {
         bool is_valid_header = getBlockHeader(blockNumber, blockHeader);
         require(is_valid_header, "Invalid block header");
 
-        RLPReader.RLPItem[] memory items = blockHeader.toRlpItem().toList();
-        return bytes32(items[4].toUint()); // The transactions root is the 5th item
+        Lib_RLPReader.RLPItem[] memory items = blockHeader
+            .toRLPItem()
+            .readList();
+        return bytes32(items[4].readUint256()); // The transactions root is the 5th item
     }
 
     // =================================
-    // 4. Verifying Data Against the Chosen Root (Optional)
+    // 4. Verifying Data Against the Chosen Root (Account)
     // =================================
 
-    function verifyInclusion(
+    function verifyAccount(
         uint256 blockNumber,
         bytes memory blockHeader,
-        RootType rootType,
-        bytes32 key,
-        bytes memory proof
-    ) public view returns (bool) {
-        // Retrieve the root based on the specified type
-        bytes32 root;
-        if (rootType == RootType.StateRoot) {
-            root = getStateRoot(blockNumber, blockHeader);
-        } else if (rootType == RootType.TransactionsRoot) {
-            root = getTransactionRoot(blockNumber, blockHeader);
-        } else if (rootType == RootType.ReceiptsRoot) {
-            root = getReceiptsRoot(blockNumber, blockHeader);
-        } else {
-            revert("Invalid root type");
+        bytes memory accountTrieProof,
+        address account
+    )
+        public
+        view
+        returns (
+            uint256 nonce,
+            uint256 accountBalance,
+            bytes32 codeHash,
+            bytes32 storageRoot
+        )
+    {
+        // Retrieve the root based on the specified type (valid)
+        bytes32 stateRoot = getStateRoot(blockNumber, blockHeader);
+
+        // Retrieve the key from the account
+        bytes memory accountKey = abi.encodePacked(account);
+
+        // Verify the account
+        (bool doesAccountExist, bytes memory accountRLP) = Lib_SecureMerkleTrie
+            .get(accountKey, accountTrieProof, stateRoot);
+
+        // Decode the [`accountRLP`] into a struct
+        (nonce, accountBalance, storageRoot, codeHash) = _decodeAccountFields(
+            doesAccountExist,
+            accountRLP
+        );
+    }
+
+    // Helper function to rlp decode the account fields ( referenced from Herodotus [FactRegistry.sol](https://github.com/HerodotusDev/herodotus-evm/blob/553a49b1f85d44ef378de13fbbf58e4e944fc289/src/core/FactsRegistry.sol#L134C67-L134C67) )
+    function _decodeAccountFields(
+        bool doesAccountExist,
+        bytes memory accountRLP
+    )
+        internal
+        pure
+        returns (
+            uint256 nonce,
+            uint256 balance,
+            bytes32 storageRoot,
+            bytes32 codeHash
+        )
+    {
+        if (!doesAccountExist) {
+            return (0, 0, EMPTY_TRIE_ROOT_HASH, EMPTY_CODE_HASH);
         }
 
-        // 1. Calculate the key hash(=leaf)
-        (bool doesExist, bytes memory valueRLP) = Lib_SecureMerkleTrie.get(
-            abi.encodePacked(key),
-            proof,
-            root
+        Lib_RLPReader.RLPItem[] memory accountFields = accountRLP
+            .toRLPItem()
+            .readList();
+
+        nonce = accountFields[ACCOUNT_NONCE_INDEX].readUint256();
+        balance = accountFields[ACCOUNT_BALANCE_INDEX].readUint256();
+        codeHash = accountFields[ACCOUNT_CODE_HASH_INDEX].readBytes32();
+        storageRoot = accountFields[ACCOUNT_STORAGE_ROOT_INDEX].readBytes32();
+    }
+
+    // =================================
+    // 5. Verifying Data Against the Chosen Root (Storage)
+    // =================================
+    function verifyStorage(
+        bytes32 storageRoot,
+        bytes32 slot,
+        bytes calldata storageSlotTrieProof
+    ) public view returns (bytes32 slotValue) {
+        // Get valid storage root from account ( Step 4 )
+
+        // Retrieve the key from the storage slot
+        bytes memory storageKey = abi.encodePacked(slot);
+
+        // Verify the account
+        (, bytes memory slotValueRLP) = Lib_SecureMerkleTrie.get(
+            storageKey,
+            storageSlotTrieProof,
+            storageRoot
         );
 
-        return doesExist;
+        // Decode the [`slotValueRLP`] into a value
+        slotValue = slotValueRLP.toRLPItem().readBytes32();
     }
 }
