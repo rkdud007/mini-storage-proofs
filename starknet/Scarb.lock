@@ -2,6 +2,11 @@
 version = 1
 
 [[package]]
+name = "cairo_lib"
+version = "0.2.0"
+source = "git+https://github.com/HerodotusDev/cairo-lib.git#a0c0ee4feeb4edb61e7a35d29595ad8647c3d469"
+
+[[package]]
 name = "snforge_std"
 version = "0.1.0"
 source = "git+https://github.com/foundry-rs/starknet-foundry?tag=v0.13.1#e1412ed040d10e66be0fd84115f72a667b57a116"
@@ -10,5 +15,6 @@ source = "git+https://github.com/foundry-rs/starknet-foundry?tag=v0.13.1#e1412ed
 name = "starknet_storage_proof"
 version = "0.1.0"
 dependencies = [
+ "cairo_lib",
  "snforge_std",
 ]
