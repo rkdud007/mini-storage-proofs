@@ -2,6 +2,11 @@
 version = 1
 
 [[package]]
+name = "alexandria_merkle_tree"
+version = "0.1.0"
+source = "git+https://github.com/keep-starknet-strange/alexandria.git#ecc881e2aee668332441bdfa32336e3404cf8eb1"
+
+[[package]]
 name = "cairo_lib"
 version = "0.2.0"
 source = "git+https://github.com/HerodotusDev/cairo-lib.git#a0c0ee4feeb4edb61e7a35d29595ad8647c3d469"
@@ -15,6 +20,7 @@ source = "git+https://github.com/foundry-rs/starknet-foundry?tag=v0.13.1#e1412ed
 name = "starknet_storage_proof"
 version = "0.1.0"
 dependencies = [
+ "alexandria_merkle_tree",
  "cairo_lib",
  "snforge_std",
 ]

@@ -8,6 +8,7 @@ edition = "2023_10"
 [dependencies]
 snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.13.1" }
 cairo_lib = { git = "https://github.com/HerodotusDev/cairo-lib.git" }
+alexandria_merkle_tree = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
 starknet = "2.4.1"
 
 [[target.starknet-contract]]

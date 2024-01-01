@@ -13,18 +13,22 @@ trait IStarknetStorageProofs<TContractState> {
         event_commitment: felt252,
         parent_block_hash: felt252
     ) -> bool;
-    fn get_state_root(
+    fn get_contract_trie_root(
         self: @TContractState,
         block_number: felt252,
         global_state_root: felt252,
-        sequencer_address: felt252,
-        block_timestamp: felt252,
-        transaction_count: felt252,
-        transaction_commitment: felt252,
-        event_count: felt252,
-        event_commitment: felt252,
-        parent_block_hash: felt252
+        contract_trie_root: felt252,
+        class_trie_root: felt252
     ) -> felt252;
+    fn verify_contract(
+        self: @TContractState,
+        block_number: felt252,
+        contract_trie_root: felt252,
+        contract_trie_proof: Span<felt252>,
+        class_hash: felt252,
+        storage_root: felt252,
+        nonce: felt252,
+    ) -> (felt252, felt252, felt252);
 }
 
 
@@ -36,9 +40,14 @@ mod StarknetStorageProofs {
     use core::box::BoxTrait;
     use core::pedersen::PedersenImpl;
     use core::pedersen::PedersenTrait;
+    use core::poseidon::PoseidonImpl;
+    use core::poseidon::PoseidonTrait;
     use starknet::get_block_info;
     use starknet::get_block_hash_syscall;
     use cairo_lib::utils::types::words64::Words64;
+    use alexandria_merkle_tree::merkle_tree::{
+        Hasher, MerkleTree, pedersen::PedersenHasherImpl, MerkleTreeTrait,
+    };
 
     type Headers = Span<Words64>;
 
@@ -105,38 +114,63 @@ mod StarknetStorageProofs {
                 return false;
             }
         }
+
         // =================================
-        // 3. Determining the Desired Root
+        // 3. Determining the Desired Root (Contract tree root)
         // =================================
 
-        // get origin chain's state root on destination chain
-        fn get_state_root(
+        // get origin chain's contract_trie_root on destination chain
+        fn get_contract_trie_root(
             self: @ContractState,
             block_number: felt252,
             global_state_root: felt252,
-            sequencer_address: felt252,
-            block_timestamp: felt252,
-            transaction_count: felt252,
-            transaction_commitment: felt252,
-            event_count: felt252,
-            event_commitment: felt252,
-            parent_block_hash: felt252
+            contract_trie_root: felt252,
+            class_trie_root: felt252
         ) -> felt252 {
-            let is_valid_header = self
-                .get_block_header(
-                    block_number,
-                    global_state_root,
-                    sequencer_address,
-                    block_timestamp,
-                    transaction_count,
-                    transaction_commitment,
-                    event_count,
-                    event_commitment,
-                    parent_block_hash
-                );
-            assert(is_valid_header, 'Invalid block header');
+            // Step 1. Construct the state commitment
+            let hash_poseidon = PoseidonImpl::new();
+            hash_poseidon.update('STARKNET_STATE_V0');
+            hash_poseidon.update(contract_trie_root);
+            hash_poseidon.update(class_trie_root);
+            let state_commitment = hash_poseidon.finalize();
 
-            return global_state_root;
+            // Step 2. Verify the state commitment
+            assert(state_commitment == global_state_root, 'state commitment does not match');
+
+            return contract_trie_root;
+        }
+
+        // =================================
+        // 4. Verifying Data Against the Chosen Root (Contract)
+        // =================================
+
+        fn verify_contract(
+            self: @ContractState,
+            block_number: felt252,
+            contract_trie_root: felt252,
+            contract_trie_proof: Span<felt252>,
+            class_hash: felt252,
+            storage_root: felt252,
+            nonce: felt252,
+        ) -> (felt252, felt252, felt252) {
+            // Step 1. Compute the leaf of contract trie
+            let hash_pedersen = PedersenImpl::new(0);
+            hash_pedersen.update(class_hash);
+            hash_pedersen.update(storage_root);
+            hash_pedersen.update(nonce);
+            hash_pedersen.update(0);
+            let contract_leaf = hash_pedersen.finalize();
+
+            // Step 2. Verify the root
+            let mut merkle_tree: MerkleTree<Hasher> = MerkleTreeTrait::new();
+            let computed_root = merkle_tree.compute_root(contract_leaf, contract_trie_proof);
+            assert(computed_root == contract_trie_root, 'compute valid root failed');
+
+            // Step 3. Verify the proof
+            let result = merkle_tree.verify(computed_root, contract_leaf, contract_trie_proof);
+            assert(result, 'verify valid proof failed');
+
+            return (class_hash, storage_root, nonce);
         }
     }
 }
