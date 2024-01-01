@@ -1,3 +1,4 @@
+use alexandria_merkle_tree::storage_proof::TrieNode;
 #[starknet::interface]
 trait IStarknetStorageProofs<TContractState> {
     fn get_block_hash(self: @TContractState, block_number: u64) -> felt252;
@@ -28,12 +29,27 @@ trait IStarknetStorageProofs<TContractState> {
         class_hash: felt252,
         storage_root: felt252,
         nonce: felt252,
-    ) -> (felt252, felt252, felt252);
+        contract_state_hash_version: felt252,
+    ) -> (felt252, felt252, felt252, felt252);
+    fn verify_storage(
+        self: @TContractState,
+        state_commitment: felt252,
+        class_commitment: felt252,
+        contract_address: felt252,
+        storage_address: felt252,
+        storage_trie_proof: Span<felt252>,
+        contract_trie_proof: Span<felt252>,
+        class_hash: felt252,
+        storage_root: felt252,
+        nonce: felt252,
+        contract_state_hash_version: felt252,
+    ) -> felt252;
 }
 
 
 #[starknet::contract]
 mod StarknetStorageProofs {
+    use core::array::ArrayTrait;
     use core::traits::TryInto;
     use core::hash::HashStateTrait;
     use core::result::ResultTrait;
@@ -48,8 +64,28 @@ mod StarknetStorageProofs {
     use alexandria_merkle_tree::merkle_tree::{
         Hasher, MerkleTree, pedersen::PedersenHasherImpl, MerkleTreeTrait,
     };
+    use alexandria_merkle_tree::storage_proof::{
+        ContractStateProof, ContractData, TrieNode, BinaryNode, EdgeNode, verify
+    };
 
-    type Headers = Span<Words64>;
+    //? TODO: How to cast in correct format?
+    fn cast_proof_type(mut proof: Span<felt252>) -> Array<TrieNode> {
+        let mut result: Array<TrieNode> = array![];
+        loop {
+            match proof.pop_front() {
+                Option::Some(proof_element) => {
+                    let edge_node = TrieNode::Binary(
+                        BinaryNode {
+                            left: *proof.pop_front().unwrap(), right: *proof.pop_front().unwrap(),
+                        }
+                    );
+                    result.append(edge_node);
+                },
+                Option::None => { break; },
+            }
+        };
+        result
+    }
 
     #[storage]
     struct Storage {
@@ -152,13 +188,14 @@ mod StarknetStorageProofs {
             class_hash: felt252,
             storage_root: felt252,
             nonce: felt252,
-        ) -> (felt252, felt252, felt252) {
+            contract_state_hash_version: felt252,
+        ) -> (felt252, felt252, felt252, felt252) {
             // Step 1. Compute the leaf of contract trie
             let hash_pedersen = PedersenImpl::new(0);
             hash_pedersen.update(class_hash);
             hash_pedersen.update(storage_root);
             hash_pedersen.update(nonce);
-            hash_pedersen.update(0);
+            hash_pedersen.update(contract_state_hash_version);
             let contract_leaf = hash_pedersen.finalize();
 
             // Step 2. Verify the root
@@ -170,7 +207,41 @@ mod StarknetStorageProofs {
             let result = merkle_tree.verify(computed_root, contract_leaf, contract_trie_proof);
             assert(result, 'verify valid proof failed');
 
-            return (class_hash, storage_root, nonce);
+            return (class_hash, storage_root, nonce, contract_state_hash_version);
+        }
+
+        // =================================
+        // 5. Verifying Data Against the Chosen Root (Storage)
+        // =================================
+        fn verify_storage(
+            self: @ContractState,
+            state_commitment: felt252,
+            class_commitment: felt252,
+            contract_address: felt252,
+            storage_address: felt252,
+            storage_trie_proof: Span<felt252>,
+            contract_trie_proof: Span<felt252>,
+            class_hash: felt252,
+            storage_root: felt252,
+            nonce: felt252,
+            contract_state_hash_version: felt252,
+        ) -> felt252 {
+            let storage_proof = ContractStateProof {
+                class_commitment,
+                contract_data: ContractData {
+                    class_hash,
+                    nonce,
+                    contract_state_hash_version,
+                    storage_proof: cast_proof_type(storage_trie_proof),
+                },
+                contract_proof: cast_proof_type(contract_trie_proof),
+            };
+
+            let storage_value = verify(
+                state_commitment, contract_address, storage_address, storage_proof
+            );
+            return storage_value;
         }
     }
 }
+
