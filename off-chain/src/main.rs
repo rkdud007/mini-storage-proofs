@@ -112,6 +112,8 @@ async fn get_storage_proof(
         )
         .await?;
 
+    println!("{:#?}", proof_response);
+
     let storageproof = proof_response.storage_proof;
     let proofs = concatenate_proof(storageproof[0].proof.clone());
     let rlp_encoded_proof = encode_rlp(proofs);
@@ -135,6 +137,8 @@ async fn main() {
 
     // Goerli USDC contract address
     let account = "0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4";
-    let storage_slot = H256::zero();
+    let storage_slot_str = "0x0000000000000000000000000000000000000000000000000000000000000002";
+    let storage_slot = storage_slot_str.parse::<H256>().unwrap();
+
     let _ = get_storage_proof(blocknumber, &rpc_provider, account, storage_slot).await;
 }

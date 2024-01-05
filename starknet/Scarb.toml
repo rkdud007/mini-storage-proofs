@@ -13,3 +13,4 @@ starknet = "2.4.1"
 
 [[target.starknet-contract]]
 casm = true
+sierra = true
