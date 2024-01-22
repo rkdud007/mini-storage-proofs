@@ -2,6 +2,13 @@
 
 **This project is totally personal project made it for fun and atm working in progress. Fixing minor issuses and working on starknet contracts**
 
+### Detail Explain about this project
+
+- [blog post](https://www.piapark.me/blog/mini-storage-proofs.html)
+- [video](https://youtu.be/2GHI0Y92Vfg)
+
+### Contract
+
 - [Goerli Storage Proof Contract](https://goerli.etherscan.io/address/0x9e2fd4b1cab69c98c48ff6bbea8c897b8dd5cba3) : 0x9e2Fd4B1Cab69c98c48fF6Bbea8c897b8DD5cbA3
 
 This is mini storage proof project, goal is to simplify the whole workflow with minimum implementation from accessing data on chain in trust-less way. This repo forrlowing [Herodotus Storage Proof Workflow](https://docs.herodotus.dev/herodotus-docs/developers/storage-proofs/workflow)
