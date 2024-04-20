@@ -21,6 +21,9 @@ pub struct EvmBlockHeader {
     pub nonce: String,
     pub base_fee_per_gas: Option<u64>,
     pub withdrawals_root: Option<String>,
+    pub blob_gas_used: Option<u64>,
+    pub excess_blob_gas: Option<u64>,
+    pub parent_beacon_block_root: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -46,6 +49,9 @@ pub struct EvmBlockHeaderFromRpc {
     pub transactions_root: String,
     pub base_fee_per_gas: Option<String>,
     pub withdrawals_root: Option<String>,
+    pub blob_gas_used: Option<String>,
+    pub excess_blob_gas: Option<String>,
+    pub parent_beacon_block_root: Option<String>,
 }
 
 impl From<&EvmBlockHeaderFromRpc> for EvmBlockHeader {
@@ -71,6 +77,9 @@ impl From<&EvmBlockHeaderFromRpc> for EvmBlockHeader {
                 .base_fee_per_gas
                 .map(|x| x.parse::<u64>().unwrap()),
             withdrawals_root: value.withdrawals_root.clone(),
+            blob_gas_used: value.blob_gas_used.clone().map(|x| x.parse::<u64>().unwrap()),
+            excess_blob_gas: value.excess_blob_gas.clone().map(|x| x.parse::<u64>().unwrap()),
+            parent_beacon_block_root: value.parent_beacon_block_root.clone(),
         }
     }
 }
@@ -79,7 +88,10 @@ impl Encodable for EvmBlockHeader {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(
             15 + self.base_fee_per_gas.is_some() as usize
-                + self.withdrawals_root.is_some() as usize,
+                + self.withdrawals_root.is_some() as usize
+                + self.blob_gas_used.is_some() as usize
+                + self.excess_blob_gas.is_some() as usize
+                + self.parent_beacon_block_root.is_some() as usize,
         );
 
         s.append(&safe_hex_decode(&self.parent_hash));
@@ -107,6 +119,18 @@ impl Encodable for EvmBlockHeader {
 
         if let Some(ref withdrawals_root) = self.withdrawals_root {
             s.append(&safe_hex_decode(withdrawals_root));
+        }
+
+        if let Some(blob_gas_used) = self.blob_gas_used {
+            s.append(&blob_gas_used);
+        }
+
+        if let Some(excess_blob_gas) = self.excess_blob_gas {
+            s.append(&excess_blob_gas);
+        }
+
+        if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
+            s.append(&safe_hex_decode(parent_beacon_block_root));
         }
     }
 }
