@@ -40,6 +40,9 @@ pub async fn get_encoded_block_header(rpc_provider: &Provider<Http>) -> Result<u
         transactions_root: hex::encode(block.transactions_root),
         base_fee_per_gas: block.base_fee_per_gas.map(|value| value.to_string()),
         withdrawals_root: block.withdrawals_root.map(hex::encode),
+        blob_gas_used: block.blob_gas_used.map(|value| value.to_string()),
+        excess_blob_gas: block.excess_blob_gas.map(|value| value.to_string()),
+        parent_beacon_block_root: block.parent_beacon_block_root.map(hex::encode),
     };
 
     let evm_block_header = EvmBlockHeader::from(&header_from_rpc);
@@ -51,6 +54,9 @@ pub async fn get_encoded_block_header(rpc_provider: &Provider<Http>) -> Result<u
     println!("Hexadecimal Block Header: 0x{}\n", blockheader_hex);
 
     let blockhash = keccak256(encoded_block_header);
+
+    assert_eq!(blockhash, block.hash.unwrap().0);
+
     let blockhash_hex = hex::encode(blockhash);
 
     println!("Hexadecimal Block Hash: 0x{}\n", blockhash_hex);
@@ -127,7 +133,7 @@ async fn get_storage_proof(
 #[tokio::main]
 async fn main() {
     let rpc_provider = Provider::<Http>::try_from(
-        "https://eth-goerli.g.alchemy.com/v2/gfIH02sddAK81ihHEZcniDlaERa3D7d4",
+        "https://ethereum-sepolia-rpc.publicnode.com",
     )
     .unwrap();
     let blocknumber = get_encoded_block_header(&rpc_provider).await.unwrap();
